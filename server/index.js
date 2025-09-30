@@ -31,8 +31,25 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(helmet()); // Security headers
+
+// Normalize allowed origins (remove trailing slashes, allow comma-separated list)
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
+  .split(',')
+  .map(origin => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true); // Allow non-browser requests
+    }
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+    console.warn(`🚫 CORS blocked origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json()); // Parse JSON bodies
