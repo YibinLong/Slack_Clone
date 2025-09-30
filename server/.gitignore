@@ -1,0 +1,23 @@
+# Environment variables - CRITICAL: Never commit these!
+.env
+.env.local
+.env.production
+
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Uploads (if storing files locally instead of cloud)
+uploads/
+public/uploads/
+
+# Database dumps
+*.sql
+*.dump
+
+# OS Files
+.DS_Store
