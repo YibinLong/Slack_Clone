@@ -7,6 +7,7 @@ const express = require('express');
 const Joi = require('joi');
 const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { isWorkspaceAdmin, isWorkspaceOwner } = require('../middleware/permissions');
 
 const router = express.Router();
 
@@ -321,6 +322,170 @@ router.get('/:workspaceId/invite-info', async (req, res) => {
 
   } catch (error) {
     console.error('Get invite info error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all members of a workspace (with their roles)
+router.get('/:workspaceId/members', async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const userId = req.user.userId;
+
+    // Get workspace internal ID
+    const workspaceResult = await pool.query(
+      'SELECT id FROM workspaces WHERE workspace_id = $1',
+      [workspaceId]
+    );
+
+    if (workspaceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+
+    const workspace = workspaceResult.rows[0];
+
+    // Check if user is a member
+    const memberCheck = await pool.query(
+      'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
+      [workspace.id, userId]
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied to this workspace' });
+    }
+
+    // Get all members with their user info
+    const membersResult = await pool.query(`
+      SELECT u.id, u.email, u.display_name, wm.role, wm.joined_at
+      FROM workspace_members wm
+      JOIN users u ON wm.user_id = u.id
+      WHERE wm.workspace_id = $1
+      ORDER BY 
+        CASE wm.role 
+          WHEN 'owner' THEN 1 
+          WHEN 'admin' THEN 2 
+          ELSE 3 
+        END,
+        wm.joined_at ASC
+    `, [workspace.id]);
+
+    res.json({
+      members: membersResult.rows.map(member => ({
+        id: member.id,
+        email: member.email,
+        displayName: member.display_name,
+        role: member.role,
+        joinedAt: member.joined_at
+      }))
+    });
+
+  } catch (error) {
+    console.error('Get members error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update member role (admin/owner only)
+router.put('/:workspaceId/members/:memberId/role', isWorkspaceAdmin, async (req, res) => {
+  try {
+    const { workspaceId, memberId } = req.params;
+    const { role } = req.body;
+    const userId = req.user.userId;
+
+    // Validate role
+    if (!['member', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be "member" or "admin"' });
+    }
+
+    // Get workspace internal ID
+    const workspaceResult = await pool.query(
+      'SELECT id, owner_id FROM workspaces WHERE workspace_id = $1',
+      [workspaceId]
+    );
+
+    if (workspaceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+
+    const workspace = workspaceResult.rows[0];
+
+    // Prevent changing owner's role
+    if (workspace.owner_id === parseInt(memberId)) {
+      return res.status(403).json({ error: 'Cannot change workspace owner role' });
+    }
+
+    // Prevent non-owners from promoting to admin
+    if (role === 'admin' && workspace.owner_id !== userId) {
+      return res.status(403).json({ error: 'Only workspace owner can promote members to admin' });
+    }
+
+    // Update role
+    await pool.query(
+      'UPDATE workspace_members SET role = $1 WHERE workspace_id = $2 AND user_id = $3',
+      [role, workspace.id, memberId]
+    );
+
+    res.json({ 
+      message: 'Member role updated successfully',
+      memberId,
+      newRole: role
+    });
+
+  } catch (error) {
+    console.error('Update role error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Remove member from workspace (admin/owner only)
+router.delete('/:workspaceId/members/:memberId', isWorkspaceAdmin, async (req, res) => {
+  try {
+    const { workspaceId, memberId } = req.params;
+    const userId = req.user.userId;
+
+    // Get workspace internal ID
+    const workspaceResult = await pool.query(
+      'SELECT id, owner_id FROM workspaces WHERE workspace_id = $1',
+      [workspaceId]
+    );
+
+    if (workspaceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+
+    const workspace = workspaceResult.rows[0];
+
+    // Prevent removing owner
+    if (workspace.owner_id === parseInt(memberId)) {
+      return res.status(403).json({ error: 'Cannot remove workspace owner' });
+    }
+
+    // Get target member's role
+    const memberResult = await pool.query(
+      'SELECT role FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
+      [workspace.id, memberId]
+    );
+
+    if (memberResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found in workspace' });
+    }
+
+    // Only owner can remove admins
+    const targetRole = memberResult.rows[0].role;
+    if (targetRole === 'admin' && workspace.owner_id !== userId) {
+      return res.status(403).json({ error: 'Only workspace owner can remove admins' });
+    }
+
+    // Remove from workspace (cascades to channels via database constraints)
+    await pool.query(
+      'DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
+      [workspace.id, memberId]
+    );
+
+    res.json({ message: 'Member removed successfully' });
+
+  } catch (error) {
+    console.error('Remove member error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
