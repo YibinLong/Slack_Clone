@@ -15,6 +15,7 @@ import CreateWorkspaceModal from '../components/CreateWorkspaceModal';
 import CreateChannelModal from '../components/CreateChannelModal';
 import JoinWorkspaceModal from '../components/JoinWorkspaceModal';
 import InviteModal from '../components/InviteModal';
+import ManageMembersModal from '../components/ManageMembersModal';
 
 export default function Workspace({ user, setUser }) {
   const [workspaces, setWorkspaces] = useState([]);
@@ -28,6 +29,7 @@ export default function Workspace({ user, setUser }) {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showJoinWorkspace, setShowJoinWorkspace] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showManageMembers, setShowManageMembers] = useState(false);
   const [typingUsers, setTypingUsers] = useState([]);
   const router = useRouter();
 
@@ -326,6 +328,7 @@ export default function Workspace({ user, setUser }) {
         onSelectChannel={selectChannel}
         onCreateChannel={() => setShowCreateChannel(true)}
         onShowInvite={() => setShowInviteModal(true)}
+        onManageMembers={() => setShowManageMembers(true)}
         onLogout={handleLogout}
       />
 
@@ -397,6 +400,14 @@ export default function Workspace({ user, setUser }) {
         <InviteModal
           workspace={currentWorkspace}
           onClose={() => setShowInviteModal(false)}
+        />
+      )}
+
+      {showManageMembers && currentWorkspace && (
+        <ManageMembersModal
+          workspace={currentWorkspace}
+          currentUser={user}
+          onClose={() => setShowManageMembers(false)}
         />
       )}
     </div>

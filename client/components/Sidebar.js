@@ -13,6 +13,7 @@ export default function Sidebar({
   onSelectChannel,
   onCreateChannel,
   onShowInvite,
+  onManageMembers,
   onLogout
 }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -22,25 +23,50 @@ export default function Sidebar({
       {/* Current Workspace Header */}
       <div className="p-4 border-b border-slack-hover">
         {currentWorkspace ? (
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h1 className="text-lg font-semibold truncate">
-                {currentWorkspace.name}
-              </h1>
-              <p className="text-xs text-gray-300 truncate">
-                ID: {currentWorkspace.id}
-              </p>
+          <>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h1 className="text-lg font-semibold truncate">
+                  {currentWorkspace.name}
+                </h1>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-gray-300 truncate">
+                    ID: {currentWorkspace.id}
+                  </p>
+                  {currentWorkspace.userRole && (
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      currentWorkspace.userRole === 'owner' 
+                        ? 'bg-yellow-500 text-white'
+                        : currentWorkspace.userRole === 'admin'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-500 text-white'
+                    }`}>
+                      {currentWorkspace.userRole.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={onShowInvite}
+                className="text-gray-300 hover:text-white p-1 rounded"
+                title="Invite people"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </button>
             </div>
-            <button
-              onClick={onShowInvite}
-              className="text-gray-300 hover:text-white p-1 rounded"
-              title="Invite people"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            </button>
-          </div>
+            
+            {/* Manage Members button (for admins/owners) */}
+            {(currentWorkspace.userRole === 'owner' || currentWorkspace.userRole === 'admin') && (
+              <button
+                onClick={onManageMembers}
+                className="w-full mt-3 px-3 py-2 bg-slack-hover hover:bg-primary-600 rounded text-sm transition-colors"
+              >
+                ⚙️ Manage Members
+              </button>
+            )}
+          </>
         ) : (
           <div className="text-center">
             <h1 className="text-lg font-semibold">Select a Workspace</h1>
