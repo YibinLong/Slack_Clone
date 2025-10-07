@@ -65,7 +65,16 @@ app.use(cors({
 }));
 app.use(express.json()); // Parse JSON bodies
 
-// Basic health check endpoint
+// Human-friendly root to indicate backend status
+app.get('/', (req, res) => {
+  res.json({
+    service: 'Slack Clone Backend API',
+    status: 'OK',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Basic health check endpoint (for monitoring)
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
