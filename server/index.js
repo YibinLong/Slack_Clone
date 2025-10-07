@@ -20,10 +20,27 @@ const app = express();
 const server = http.createServer(app);
 
 // Set up Socket.IO with CORS
+// Normalize allowed origins (remove trailing slashes, allow comma-separated list)
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
+  .split(',')
+  .map(origin => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-    methods: ["GET", "POST"]
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true);
+      }
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+      console.warn(`🚫 Socket.IO blocked origin: ${origin}`);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -31,12 +48,6 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(helmet()); // Security headers
-
-// Normalize allowed origins (remove trailing slashes, allow comma-separated list)
-const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
-  .split(',')
-  .map(origin => origin.trim().replace(/\/$/, ''))
-  .filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
